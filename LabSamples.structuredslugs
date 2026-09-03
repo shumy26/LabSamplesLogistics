@@ -1,0 +1,111 @@
+[INPUT]
+request
+auth_present
+human_pickup
+at_floor
+at_lab
+barcode_ok
+
+[OUTPUT]
+goto_floor
+goto_lab
+scan
+load_machine
+log_event
+
+# -----------------------------------------------------------
+# Premissas Iniciais do Ambiente (phi_i)
+# -----------------------------------------------------------
+[ENV_INIT]
+!request
+!auth_present
+!human_pickup
+at_floor
+!at_lab
+!barcode_ok
+
+# -----------------------------------------------------------
+# Garantias Iniciais do Sistema (psi_i)
+# -----------------------------------------------------------
+[SYS_INIT]
+!goto_floor
+!goto_lab
+!scan
+!load_machine
+!log_event
+
+# -----------------------------------------------------------
+# Premissas de Transição do Ambiente (phi_s)
+# -----------------------------------------------------------
+[ENV_TRANS]
+# Pavilhão e Laboratório mutuamente exclusivos
+!(at_floor & at_lab)
+
+# Inércia espacial
+(at_floor & !goto_lab) -> at_floor'
+(at_lab & !goto_floor) -> at_lab'
+
+# Causalidade do leitor
+(!barcode_ok & !scan) -> !barcode_ok'
+
+# Inércia da amostra: permanece até carga na máquina ou retirada humana
+(barcode_ok & !load_machine & !human_pickup) -> barcode_ok'
+
+# Consumo/Remoção da amostra por máquina ou por humano
+(load_machine | human_pickup) -> !barcode_ok'
+
+# -----------------------------------------------------------
+# Garantias de Transição do Sistema (psi_s)
+# -----------------------------------------------------------
+[SYS_TRANS]
+# Segurança de navegação
+!(goto_floor & goto_lab)
+
+# 1. Regras de Leitura e Amostragem no Piso
+scan -> (at_floor & auth_present & !barcode_ok & !human_pickup)
+
+# 2. Pipeline de Partida para o Lab
+goto_lab -> (barcode_ok | !at_floor)
+
+
+# Persistência da navegação (cancela se houver human_pickup)
+((request & barcode_ok & at_floor & !human_pickup) | (goto_lab & !at_lab & !human_pickup)) -> goto_lab'
+
+# 3. Operação no Laboratório e Descarga
+load_machine -> (at_lab & barcode_ok & !human_pickup)
+(at_lab & barcode_ok & !human_pickup) -> load_machine
+
+
+# Proibido sair do lab enquanto ainda estiver com a amostra não recolhida
+(at_lab & barcode_ok & !human_pickup) -> !goto_floor
+
+# 4. Retorno ao Pavilhão
+# Se estiver no lab sem amostra (ou após human_pickup), volta para o piso
+(at_lab & (!barcode_ok | human_pickup)) -> goto_floor'
+(goto_floor & !at_floor) -> goto_floor'
+
+# 5. Estado Ocioso (Idle)
+(!request & at_floor & !goto_lab & !goto_floor) -> !goto_lab'
+(!request & at_floor & !goto_lab & !goto_floor) -> !goto_floor'
+
+# 6. Auditoria / Logs
+scan -> log_event
+goto_floor -> log_event
+goto_lab -> log_event
+load_machine -> log_event
+
+# -----------------------------------------------------------
+# Premissas de Liveness do Ambiente (phi_l)
+# -----------------------------------------------------------
+[ENV_LIVENESS]
+goto_lab -> at_lab
+goto_floor -> at_floor
+(auth_present & scan) -> barcode_ok
+
+# -----------------------------------------------------------
+# Garantias de Liveness do Sistema (psi_l)
+# -----------------------------------------------------------
+[SYS_LIVENESS]
+# O ciclo é concluído por máquina OU por coleta/resgate humano
+!(request & auth_present) | (load_machine | human_pickup)
+at_floor
