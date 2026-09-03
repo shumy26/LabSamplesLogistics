@@ -2,11 +2,11 @@
 
 ## Instruções para reprodução da síntese de controlador para missão
 
+Em sistemas Linux:
+
 ### Passo 1: Instalação da ferramenta _slugs_
 
 Seguir instruções do repositório [_slugs_](https://github.com/VerifiableRobotics/slugs):
-
-Em sistemas Linux:
 
 ```bash
 $ git clone https://github.com/VerifiableRobotics/slugs
